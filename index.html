@@ -23,8 +23,26 @@
     color:var(--gold); font-size:clamp(2rem,7vw,3.2rem); margin:8px 0;
     text-shadow:0 0 14px rgba(245,197,66,.6),0 3px 0 var(--gold-dark);
   }
-  .suits{text-align:center; letter-spacing:.5em; font-size:1.4rem}
-  .suits .r{color:#ff5a6e}
+
+  /* ---- decorations: card fan + dartboard ---- */
+  .decor{
+    display:flex; justify-content:center; align-items:center;
+    gap:28px; flex-wrap:wrap; margin-bottom:6px;
+  }
+  .fan{display:flex; padding:14px 10px 6px}
+  .cardwrap{
+    width:64px; margin-left:-22px;
+    filter:drop-shadow(0 4px 6px rgba(0,0,0,.55));
+    transition:transform .2s;
+  }
+  .cardwrap:first-child{margin-left:0}
+  .cardwrap svg{display:block; width:100%; height:auto}
+  .dart{
+    width:110px; height:110px;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.55));
+  }
+  .dart svg{display:block; width:100%; height:100%}
+
   .marquee{
     height:14px; margin:14px 0;
     background:radial-gradient(circle,var(--gold) 4px,transparent 5px) 0 0/20px 14px repeat-x;
@@ -42,6 +60,8 @@
     background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
     border:1px solid rgba(245,197,66,.25); font-size:1.15rem;
   }
+  /* dealer mode: extra column for the edit / delete buttons */
+  .board.dealer .row{grid-template-columns:44px 1fr auto auto; gap:8px}
   .row.top1{background:linear-gradient(90deg,#f5c542,#b8860b); color:#2b1d00; font-weight:600; font-size:1.3rem}
   .row.top2{background:linear-gradient(90deg,#d9d9d9,#8f8f8f); color:#1d1d1d; font-weight:600}
   .row.top3{background:linear-gradient(90deg,#d08a4b,#8a5122); color:#1f1000; font-weight:600}
@@ -52,6 +72,18 @@
     border-radius:999px; background:var(--red); color:#fff; border:2px dashed #fff;
   }
   .empty{text-align:center; padding:28px; opacity:.85}
+
+  .actions{display:flex; gap:6px}
+  .mini{
+    padding:4px 9px; font-size:.95rem; line-height:1.1; border-radius:6px;
+    background:rgba(0,0,0,.55); color:#fff; border:1px solid rgba(255,255,255,.6);
+  }
+  .mini.del{color:#ff9aa8}
+  .editIn{
+    padding:6px 8px; font-size:1rem; border-radius:6px; width:100%; min-width:0;
+    border:2px solid var(--gold); background:#fffdf3; color:#222;
+  }
+  .scoreEdit{width:90px}
 
   .panel{
     margin-top:22px; padding:16px; border-radius:14px;
@@ -71,8 +103,14 @@
   }
   button:hover{filter:brightness(1.1)}
   button.dark{background:#222; color:var(--gold); border-color:var(--gold)}
+  .mini{padding:4px 9px; font-size:.95rem; border-radius:6px; background:rgba(0,0,0,.55); color:#fff; border:1px solid rgba(255,255,255,.6)}
+  .mini.del{color:#ff9aa8}
   .msg{min-height:1.2em; margin-top:8px; color:#ffb3bd}
   .hint{font-size:.85rem; opacity:.85; margin:6px 0 10px}
+  .draftNote{
+    margin:10px 0; padding:8px 12px; border-radius:8px;
+    background:rgba(255,193,7,.15); border:1px dashed var(--gold); font-size:.9rem;
+  }
   .center{text-align:center}
   textarea{height:150px; margin-top:8px; font-family:monospace; font-size:.85rem}
   .hidden{display:none}
@@ -81,7 +119,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="suits"><span>♠</span> <span class="r">♥</span> <span>♣</span> <span class="r">♦</span></div>
+  <div class="decor" id="decor"></div>
   <h1>HIGH ROLLERS</h1>
   <div class="marquee"></div>
 
@@ -107,93 +145,287 @@
     </div>
     <div class="msg" id="addMsg"></div>
 
+    <div class="draftNote hidden" id="draftNote">
+      ⚠ You have unpublished changes. Only you can see them until you copy the JSON into scores.json and commit.
+    </div>
+
     <div class="hint">
-      To make scores visible to everyone: click "Copy JSON", paste it over the whole
-      content of <b>scores.json</b> on GitHub, and commit. Then press "Clear pending".
+      To make your changes visible to everyone: click "Copy JSON", paste it over the whole
+      content of <b>scores.json</b> on GitHub, and commit. After the site updates, the warning above
+      disappears by itself. Use the ✏️ and 🗑 buttons on a row to fix or remove a score.
     </div>
     <div class="inline">
       <button id="copyBtn">Copy JSON</button>
-      <button class="dark" id="clearBtn">Clear pending</button>
+      <button class="dark" id="discardBtn">Discard changes</button>
       <button class="dark" id="logoutBtn">Leave table</button>
     </div>
     <textarea id="exportBox" readonly></textarea>
   </div>
 
-  <div class="version">v2</div>
+  <div class="version">v4</div>
 </div>
 
 <script>
   const PASSWORD = "0922";
-  const LS_KEY = "casino_pending_scores";
+  const DRAFT_KEY = "casino_draft";
+  const OLD_KEY = "casino_pending_scores";   // used by v2/v3, migrated once
 
-  let published = [];   // from scores.json (what everyone sees)
-  let pending = [];     // added by you, not committed yet (only your browser has these)
+  let published = [];    // from scores.json (what everyone sees)
+  let loaded = false;    // true once scores.json was read successfully
+  let draft = null;      // your full working copy, or null if you have no changes
+  let editingIdx = null; // which row is being edited right now
   let isAdmin = false;
   try { isAdmin = sessionStorage.getItem("dealer") === "1"; } catch(e){}
 
   const $ = id => document.getElementById(id);
 
-  function loadPending(){
-    try { pending = JSON.parse(localStorage.getItem(LS_KEY)) || []; }
-    catch(e){ pending = []; }
-  }
-  function savePending(){
-    try { localStorage.setItem(LS_KEY, JSON.stringify(pending)); } catch(e){}
+  /* =========================================================
+     ILLUSTRATIONS (all drawn with code, no image files)
+     ========================================================= */
+
+  const SUITS = {
+    S: { col:"#1a1a1a", g:'<path d="M12 2C12 2 3 9 3 14C3 17 5.5 18.5 8 18.5C9.5 18.5 10.7 17.9 11.3 17C11 19 10.3 20.5 8.5 22L15.5 22C13.7 20.5 13 19 12.7 17C13.3 17.9 14.5 18.5 16 18.5C18.5 18.5 21 17 21 14C21 9 12 2 12 2Z"/>' },
+    H: { col:"#c8102e", g:'<path d="M12 21C12 21 3 14.5 3 8.5C3 5.5 5.3 3.5 8 3.5C9.8 3.5 11.3 4.5 12 6C12.7 4.5 14.2 3.5 16 3.5C18.7 3.5 21 5.5 21 8.5C21 14.5 12 21 12 21Z"/>' },
+    D: { col:"#c8102e", g:'<path d="M12 2L21 12L12 22L3 12Z"/>' },
+    C: { col:"#1a1a1a", g:'<circle cx="12" cy="7.5" r="4.6"/><circle cx="7" cy="14" r="4.6"/><circle cx="17" cy="14" r="4.6"/><path d="M12 11C12 16 11 19 9 22L15 22C13 19 12 16 12 11Z"/>' }
+  };
+
+  function card(rank, suit){
+    const s = SUITS[suit];
+    const corner =
+      '<text x="9" y="27" font-size="24" font-weight="900" fill="' + s.col + '" font-family="Playfair Display,serif">' + rank + '</text>' +
+      '<g transform="translate(8,32) scale(0.75)" fill="' + s.col + '">' + s.g + '</g>';
+    return '<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect x="2" y="2" width="96" height="136" rx="10" fill="#fffdf3" stroke="#222" stroke-width="2.5"/>' +
+      corner +
+      '<g transform="rotate(180 50 70)">' + corner + '</g>' +
+      '<g transform="translate(50,70) scale(2.4) translate(-12,-12)" fill="' + s.col + '">' + s.g + '</g>' +
+      '</svg>';
   }
 
-  function currentList(){
-    // Pending entries that are already in scores.json are skipped, so you
-    // don't get doubles if you commit and forget to press "Clear pending".
-    const remaining = published.slice();
-    const extra = [];
-    pending.forEach(p => {
-      const i = remaining.findIndex(q => q.name === p.name && q.score === p.score);
-      if(i >= 0){
-        remaining.splice(i, 1);
-      } else {
-        extra.push(p);
+  function dartboard(){
+    const C = 100;
+    const pt = (r,a) => [C + r*Math.cos(a), C + r*Math.sin(a)];
+    const wedge = (r1,r2,a1,a2) => {
+      const p1 = pt(r2,a1), p2 = pt(r2,a2), p3 = pt(r1,a2), p4 = pt(r1,a1);
+      return "M"+p1[0]+" "+p1[1]+" A"+r2+" "+r2+" 0 0 1 "+p2[0]+" "+p2[1]+
+             " L"+p3[0]+" "+p3[1]+" A"+r1+" "+r1+" 0 0 0 "+p4[0]+" "+p4[1]+" Z";
+    };
+    const BLACK="#1a1a1a", CREAM="#f3e7c3", RED="#c8102e", GREEN="#0b7a4b";
+    const rings = [
+      [85.5, 90,   RED,   GREEN],
+      [56.5, 85.5, BLACK, CREAM],
+      [52,   56.5, RED,   GREEN],
+      [8.4,  52,   BLACK, CREAM]
+    ];
+    let out = '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">';
+    out += '<circle cx="100" cy="100" r="98" fill="#111" stroke="#f5c542" stroke-width="3"/>';
+    for(let i = 0; i < 20; i++){
+      const a1 = (-90 + 18*i - 9) * Math.PI/180;
+      const a2 = (-90 + 18*i + 9) * Math.PI/180;
+      rings.forEach(r => {
+        out += '<path d="' + wedge(r[0], r[1], a1, a2) + '" fill="' + (i % 2 === 0 ? r[2] : r[3]) + '"/>';
+      });
+    }
+    out += '<circle cx="100" cy="100" r="8.4" fill="' + GREEN + '"/>';
+    out += '<circle cx="100" cy="100" r="3.4" fill="' + RED + '"/>';
+    // a dart stuck in the triple 20 (top of the board)
+    out += '<g><line x1="100" y1="46" x2="146" y2="6" stroke="#f5c542" stroke-width="3" stroke-linecap="round"/>' +
+           '<polygon points="140,2 156,6 150,20 144,12" fill="#c8102e" stroke="#7a1020" stroke-width="1"/></g>';
+    out += '</svg>';
+    return out;
+  }
+
+  function drawDecor(){
+    const fan = [["A","S",-16],["K","H",-6],["Q","D",6],["J","C",16]]
+      .map(c => '<div class="cardwrap" style="transform:rotate(' + c[2] + 'deg)">' + card(c[0], c[1]) + '</div>')
+      .join("");
+    $("decor").innerHTML = '<div class="fan">' + fan + '</div><div class="dart">' + dartboard() + '</div>';
+  }
+
+  /* =========================================================
+     DATA HELPERS
+     ========================================================= */
+
+  function clean(arr){
+    if(!Array.isArray(arr)) return [];
+    return arr
+      .filter(p => p && typeof p.name !== "undefined" && p.score !== null && p.score !== "" && Number.isFinite(Number(p.score)))
+      .map(p => ({ name: String(p.name), score: Number(p.score) }));
+  }
+
+  function sig(arr){
+    return arr.map(p => p.name + "\u0000" + p.score).sort().join("\u0001");
+  }
+
+  function getList(){
+    return draft !== null ? draft : published;
+  }
+
+  function loadDraft(){
+    try {
+      const raw = JSON.parse(localStorage.getItem(DRAFT_KEY));
+      draft = Array.isArray(raw) ? clean(raw) : null;
+    } catch(e){ draft = null; }
+  }
+  function saveDraft(){
+    try {
+      if(draft === null) localStorage.removeItem(DRAFT_KEY);
+      else localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch(e){}
+  }
+
+  // Any change goes through here: copies the published list into a draft
+  // the first time, applies the change, saves and redraws.
+  function mutate(fn){
+    if(draft === null) draft = published.map(p => ({ name: p.name, score: p.score }));
+    fn(draft);
+    saveDraft();
+    render();
+  }
+
+  // One-time carry-over of unsaved scores from the older versions
+  function migrateOld(){
+    let old = null;
+    try { old = JSON.parse(localStorage.getItem(OLD_KEY)); } catch(e){}
+    if(Array.isArray(old) && old.length && draft === null){
+      const remaining = published.slice();
+      const extra = [];
+      clean(old).forEach(p => {
+        const i = remaining.findIndex(q => q.name === p.name && q.score === p.score);
+        if(i >= 0) remaining.splice(i, 1);
+        else extra.push(p);
+      });
+      if(extra.length){
+        draft = published.map(p => ({ name: p.name, score: p.score })).concat(extra);
+        saveDraft();
       }
-    });
-    // highest first, ties keep the order they were added
-    return published.concat(extra).sort((a,b) => b.score - a.score);
+    }
+    try { localStorage.removeItem(OLD_KEY); } catch(e){}
+  }
+
+  // Once scores.json matches your draft, the draft is no longer needed
+  function dropDraftIfPublished(){
+    if(draft !== null && sig(draft) === sig(published)){
+      draft = null;
+      saveDraft();
+    }
+  }
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
+  function el(tag, cls, text){
+    const e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text !== undefined) e.textContent = text;
+    return e;
+  }
+  function btn(label, cls, title, fn){
+    const b = el("button", cls, label);
+    b.type = "button";
+    b.title = title;
+    b.onclick = fn;
+    return b;
+  }
+
+  function saveEdit(idx, nameVal, scoreVal){
+    const name = nameVal.trim();
+    const score = Number(scoreVal);
+    if(!name || scoreVal === "" || !Number.isFinite(score)){
+      alert("Enter a name and a valid number.");
+      return;
+    }
+    editingIdx = null;
+    mutate(d => { d[idx] = { name, score }; });
+  }
+
+  function deleteEntry(idx, p){
+    if(!confirm('Delete "' + p.name + '" (' + p.score + ')?')) return;
+    editingIdx = null;
+    mutate(d => { d.splice(idx, 1); });
   }
 
   function render(){
     const board = $("board");
     board.textContent = "";
-    const list = currentList();
+    board.classList.toggle("dealer", isAdmin);
 
-    if(list.length === 0){
-      const d = document.createElement("div");
-      d.className = "empty";
-      d.textContent = "No players at the table yet. Place your bets! 🎲";
-      board.appendChild(d);
+    // keep each entry's real position (idx) so edits hit the right one after sorting
+    const items = getList()
+      .map((p, idx) => ({ p, idx }))
+      .sort((a, b) => b.p.score - a.p.score);
+
+    if(items.length === 0){
+      board.appendChild(el("div", "empty", "No players at the table yet. Place your bets! 🎲"));
     }
 
-    list.forEach((p, i) => {
-      const row = document.createElement("div");
-      row.className = "row" + (i < 3 ? " top" + (i+1) : "");
+    let focusTarget = null;
 
-      const rank = document.createElement("div");
-      rank.className = "rank";
-      rank.textContent = i === 0 ? "👑" : "#" + (i+1);
+    items.forEach((it, i) => {
+      const p = it.p, idx = it.idx;
+      const row = el("div", "row" + (i < 3 ? " top" + (i+1) : ""));
+      row.appendChild(el("div", "rank", i === 0 ? "👑" : "#" + (i+1)));
 
-      const name = document.createElement("div");
-      name.className = "name";
-      name.textContent = p.name;
+      if(isAdmin && editingIdx === idx){
+        const nameIn = el("input", "editIn");
+        nameIn.type = "text";
+        nameIn.maxLength = 30;
+        nameIn.value = p.name;
 
-      const score = document.createElement("div");
-      score.className = "score";
-      score.textContent = p.score;
+        const scoreIn = el("input", "editIn scoreEdit");
+        scoreIn.type = "number";
+        scoreIn.step = "any";
+        scoreIn.value = p.score;
 
-      row.append(rank, name, score);
+        const doSave = () => saveEdit(idx, nameIn.value, scoreIn.value);
+        const doCancel = () => { editingIdx = null; render(); };
+        [nameIn, scoreIn].forEach(inp => inp.addEventListener("keydown", e => {
+          if(e.key === "Enter") doSave();
+          if(e.key === "Escape") doCancel();
+        }));
+
+        const nameCell = el("div"); nameCell.appendChild(nameIn);
+        const scoreCell = el("div"); scoreCell.appendChild(scoreIn);
+        const actions = el("div", "actions");
+        actions.append(
+          btn("✔", "mini", "Save", doSave),
+          btn("✖", "mini", "Cancel", doCancel)
+        );
+        row.append(nameCell, scoreCell, actions);
+        focusTarget = nameIn;
+      } else {
+        row.appendChild(el("div", "name", p.name));
+        row.appendChild(el("div", "score", p.score));
+        if(isAdmin){
+          const actions = el("div", "actions");
+          actions.append(
+            btn("✏️", "mini", "Edit", () => { editingIdx = idx; render(); }),
+            btn("🗑", "mini del", "Delete", () => deleteEntry(idx, p))
+          );
+          row.appendChild(actions);
+        }
+      }
       board.appendChild(row);
     });
 
+    if(focusTarget) focusTarget.focus();
+
     $("loginArea").classList.toggle("hidden", isAdmin);
     $("dealerPanel").classList.toggle("hidden", !isAdmin);
-    $("exportBox").value = JSON.stringify(currentList(), null, 2);
+    $("draftNote").classList.toggle("hidden", draft === null);
+
+    const exportList = getList()
+      .slice()
+      .sort((a, b) => b.score - a.score)
+      .map(p => ({ name: p.name, score: p.score }));
+    $("exportBox").value = JSON.stringify(exportList, null, 2);
   }
+
+  /* =========================================================
+     BUTTONS
+     ========================================================= */
 
   // ---- login ----
   $("showLoginBtn").onclick = () => {
@@ -216,6 +448,7 @@
 
   $("logoutBtn").onclick = () => {
     isAdmin = false;
+    editingIdx = null;
     try { sessionStorage.removeItem("dealer"); } catch(e){}
     render();
   };
@@ -228,13 +461,12 @@
       $("addMsg").textContent = "Enter a name and a valid number.";
       return;
     }
-    pending.push({ name, score });
-    savePending();
+    editingIdx = null;
+    mutate(d => { d.push({ name, score }); });
     $("nameIn").value = "";
     $("scoreIn").value = "";
     $("addMsg").textContent = "";
     $("nameIn").focus();
-    render();
   }
   $("addBtn").onclick = addScore;
   $("scoreIn").addEventListener("keydown", e => { if(e.key === "Enter") addScore(); });
@@ -245,20 +477,34 @@
     try { await navigator.clipboard.writeText(box.value); $("addMsg").textContent = "Copied! Paste it into scores.json."; }
     catch(e){ box.select(); document.execCommand("copy"); $("addMsg").textContent = "Copied! Paste it into scores.json."; }
   };
-  $("clearBtn").onclick = () => {
-    pending = [];
-    savePending();
+
+  // ---- discard ----
+  $("discardBtn").onclick = () => {
+    if(draft === null){
+      $("addMsg").textContent = "Nothing to discard. You're already seeing what's published.";
+      return;
+    }
+    if(!confirm("Throw away all your unpublished changes and go back to what's in scores.json?")) return;
+    draft = null;
+    editingIdx = null;
+    saveDraft();
     render();
-    $("addMsg").textContent = "Pending list cleared.";
+    $("addMsg").textContent = "Changes discarded.";
   };
 
-  // ---- start ----
-  loadPending();
+  /* =========================================================
+     START
+     ========================================================= */
+  drawDecor();
+  loadDraft();
   fetch("scores.json", { cache: "no-store" })
     .then(r => r.json())
-    .then(data => { published = Array.isArray(data) ? data : []; })
+    .then(data => { published = clean(data); loaded = true; })
     .catch(() => { published = []; })
-    .finally(render);
+    .finally(() => {
+      if(loaded){ migrateOld(); dropDraftIfPublished(); }
+      render();
+    });
 </script>
 </body>
 </html>
