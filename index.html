@@ -125,8 +125,8 @@
   const PASSWORD = "0922";
   const LS_KEY = "casino_pending_scores";
 
-  let published = [];   // from scores.json (what everyone sees)
-  let pending = [];     // added by you, not committed yet (only you see it)
+  let published = [];   
+  let pending = [];     
   let isAdmin = sessionStorage.getItem("dealer") === "1";
 
   const $ = id => document.getElementById(id);
@@ -139,11 +139,21 @@
     try { localStorage.setItem(LS_KEY, JSON.stringify(pending)); } catch(e){}
   }
 
-  function currentList(){
-    const all = isAdmin ? published.concat(pending) : published.slice();
-    // stable sort: highest first, ties keep the order they were added
-    return all.sort((a,b) => b.score - a.score);
-  }
+ function currentList(){
+  // Drop any pending entry that is already in scores.json (same name + score),
+  // so you don't get doubles if you forget to press "Clear pending" after committing.
+  const remaining = published.slice();
+  const extra = [];
+  pending.forEach(p => {
+    const i = remaining.findIndex(q => q.name === p.name && q.score === p.score);
+    if(i >= 0){
+      remaining.splice(i, 1);   
+    } else {
+      extra.push(p);           
+    }
+  });
+  return published.concat(extra).sort((a,b) => b.score - a.score);
+}
 
   function render(){
     const board = $("board");
