@@ -76,6 +76,7 @@
   .center{text-align:center}
   textarea{height:150px; margin-top:8px; font-family:monospace; font-size:.85rem}
   .hidden{display:none}
+  .version{text-align:center; margin-top:30px; font-size:.75rem; opacity:.5}
 </style>
 </head>
 <body>
@@ -86,7 +87,6 @@
 
   <div class="board" id="board"></div>
 
-  <!-- Login area (visible to everyone until dealer logs in) -->
   <div class="center" style="margin-top:22px" id="loginArea">
     <button class="dark" id="showLoginBtn">🎩 Dealer Entrance</button>
     <div class="panel hidden" id="loginPanel">
@@ -98,7 +98,6 @@
     </div>
   </div>
 
-  <!-- Dealer panel (hidden until correct password) -->
   <div class="panel hidden" id="dealerPanel">
     <h2>🎰 Dealer Table</h2>
     <div class="inline">
@@ -119,15 +118,18 @@
     </div>
     <textarea id="exportBox" readonly></textarea>
   </div>
+
+  <div class="version">v2</div>
 </div>
 
 <script>
   const PASSWORD = "0922";
   const LS_KEY = "casino_pending_scores";
 
-  let published = [];   
-  let pending = [];     
-  let isAdmin = sessionStorage.getItem("dealer") === "1";
+  let published = [];   // from scores.json (what everyone sees)
+  let pending = [];     // added by you, not committed yet (only your browser has these)
+  let isAdmin = false;
+  try { isAdmin = sessionStorage.getItem("dealer") === "1"; } catch(e){}
 
   const $ = id => document.getElementById(id);
 
@@ -139,21 +141,22 @@
     try { localStorage.setItem(LS_KEY, JSON.stringify(pending)); } catch(e){}
   }
 
- function currentList(){
-  // Drop any pending entry that is already in scores.json (same name + score),
-  // so you don't get doubles if you forget to press "Clear pending" after committing.
-  const remaining = published.slice();
-  const extra = [];
-  pending.forEach(p => {
-    const i = remaining.findIndex(q => q.name === p.name && q.score === p.score);
-    if(i >= 0){
-      remaining.splice(i, 1);   
-    } else {
-      extra.push(p);           
-    }
-  });
-  return published.concat(extra).sort((a,b) => b.score - a.score);
-}
+  function currentList(){
+    // Pending entries that are already in scores.json are skipped, so you
+    // don't get doubles if you commit and forget to press "Clear pending".
+    const remaining = published.slice();
+    const extra = [];
+    pending.forEach(p => {
+      const i = remaining.findIndex(q => q.name === p.name && q.score === p.score);
+      if(i >= 0){
+        remaining.splice(i, 1);
+      } else {
+        extra.push(p);
+      }
+    });
+    // highest first, ties keep the order they were added
+    return published.concat(extra).sort((a,b) => b.score - a.score);
+  }
 
   function render(){
     const board = $("board");
@@ -200,7 +203,7 @@
   function tryLogin(){
     if($("pw").value === PASSWORD){
       isAdmin = true;
-      sessionStorage.setItem("dealer", "1");
+      try { sessionStorage.setItem("dealer", "1"); } catch(e){}
       $("pw").value = "";
       $("loginMsg").textContent = "";
       render();
@@ -213,7 +216,7 @@
 
   $("logoutBtn").onclick = () => {
     isAdmin = false;
-    sessionStorage.removeItem("dealer");
+    try { sessionStorage.removeItem("dealer"); } catch(e){}
     render();
   };
 
