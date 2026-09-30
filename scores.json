@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>High Rollers Leaderboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt:#0b5d3b; --felt-dark:#063d27;
+    --gold:#f5c542; --gold-dark:#7a5a00;
+    --red:#c8102e; --cream:#fff8e1;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; padding:24px 12px 60px;
+    font-family:'Oswald',sans-serif; color:var(--cream);
+    background:radial-gradient(ellipse at center,var(--felt) 0%,var(--felt-dark) 100%);
+  }
+  .wrap{max-width:640px; margin:0 auto}
+  h1{
+    font-family:'Playfair Display',serif; font-weight:900; text-align:center;
+    color:var(--gold); font-size:clamp(2rem,7vw,3.2rem); margin:8px 0;
+    text-shadow:0 0 14px rgba(245,197,66,.6),0 3px 0 var(--gold-dark);
+  }
+  .suits{text-align:center; letter-spacing:.5em; font-size:1.4rem}
+  .suits .r{color:#ff5a6e}
+  .marquee{
+    height:14px; margin:14px 0;
+    background:radial-gradient(circle,var(--gold) 4px,transparent 5px) 0 0/20px 14px repeat-x;
+    animation:blink 1s steps(2) infinite;
+  }
+  @keyframes blink{50%{filter:brightness(.35)}}
+
+  .board{
+    border:4px solid var(--gold); border-radius:18px; padding:12px;
+    background:rgba(0,0,0,.28); box-shadow:0 0 25px rgba(245,197,66,.35) inset,0 8px 24px rgba(0,0,0,.5);
+  }
+  .row{
+    display:grid; grid-template-columns:56px 1fr auto; align-items:center; gap:10px;
+    padding:12px 14px; margin:8px 0; border-radius:12px;
+    background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+    border:1px solid rgba(245,197,66,.25); font-size:1.15rem;
+  }
+  .row.top1{background:linear-gradient(90deg,#f5c542,#b8860b); color:#2b1d00; font-weight:600; font-size:1.3rem}
+  .row.top2{background:linear-gradient(90deg,#d9d9d9,#8f8f8f); color:#1d1d1d; font-weight:600}
+  .row.top3{background:linear-gradient(90deg,#d08a4b,#8a5122); color:#1f1000; font-weight:600}
+  .rank{font-family:'Playfair Display',serif; font-weight:900; font-size:1.4rem; text-align:center}
+  .name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .score{
+    font-weight:600; min-width:70px; text-align:center; padding:4px 12px;
+    border-radius:999px; background:var(--red); color:#fff; border:2px dashed #fff;
+  }
+  .empty{text-align:center; padding:28px; opacity:.85}
+
+  .panel{
+    margin-top:22px; padding:16px; border-radius:14px;
+    border:2px solid var(--gold); background:rgba(0,0,0,.35);
+  }
+  .panel h2{margin:0 0 10px; font-family:'Playfair Display',serif; color:var(--gold)}
+  input,textarea,button{font-family:inherit; font-size:1rem}
+  input,textarea{
+    padding:10px 12px; border-radius:8px; border:2px solid var(--gold);
+    background:#fffdf3; color:#222; width:100%;
+  }
+  .inline{display:flex; gap:8px; flex-wrap:wrap}
+  .inline input{flex:1; min-width:120px}
+  button{
+    padding:10px 18px; border-radius:8px; border:2px solid var(--gold-dark);
+    background:linear-gradient(#ffd75e,#e0a800); color:#2b1d00; font-weight:600; cursor:pointer;
+  }
+  button:hover{filter:brightness(1.1)}
+  button.dark{background:#222; color:var(--gold); border-color:var(--gold)}
+  .msg{min-height:1.2em; margin-top:8px; color:#ffb3bd}
+  .hint{font-size:.85rem; opacity:.85; margin:6px 0 10px}
+  .center{text-align:center}
+  textarea{height:150px; margin-top:8px; font-family:monospace; font-size:.85rem}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="suits"><span>♠</span> <span class="r">♥</span> <span>♣</span> <span class="r">♦</span></div>
+  <h1>HIGH ROLLERS</h1>
+  <div class="marquee"></div>
+
+  <div class="board" id="board"></div>
+
+  <!-- Login area (visible to everyone until dealer logs in) -->
+  <div class="center" style="margin-top:22px" id="loginArea">
+    <button class="dark" id="showLoginBtn">🎩 Dealer Entrance</button>
+    <div class="panel hidden" id="loginPanel">
+      <div class="inline">
+        <input type="password" id="pw" placeholder="Enter password" inputmode="numeric" autocomplete="off">
+        <button id="loginBtn">Enter</button>
+      </div>
+      <div class="msg" id="loginMsg"></div>
+    </div>
+  </div>
+
+  <!-- Dealer panel (hidden until correct password) -->
+  <div class="panel hidden" id="dealerPanel">
+    <h2>🎰 Dealer Table</h2>
+    <div class="inline">
+      <input type="text" id="nameIn" placeholder="Player name" maxlength="30">
+      <input type="number" id="scoreIn" placeholder="Score" step="any">
+      <button id="addBtn">Deal</button>
+    </div>
+    <div class="msg" id="addMsg"></div>
+
+    <div class="hint">
+      To make scores visible to everyone: click "Copy JSON", paste it over the whole
+      content of <b>scores.json</b> on GitHub, and commit. Then press "Clear pending".
+    </div>
+    <div class="inline">
+      <button id="copyBtn">Copy JSON</button>
+      <button class="dark" id="clearBtn">Clear pending</button>
+      <button class="dark" id="logoutBtn">Leave table</button>
+    </div>
+    <textarea id="exportBox" readonly></textarea>
+  </div>
+</div>
+
+<script>
+  const PASSWORD = "0922";
+  const LS_KEY = "casino_pending_scores";
+
+  let published = [];   // from scores.json (what everyone sees)
+  let pending = [];     // added by you, not committed yet (only you see it)
+  let isAdmin = sessionStorage.getItem("dealer") === "1";
+
+  const $ = id => document.getElementById(id);
+
+  function loadPending(){
+    try { pending = JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+    catch(e){ pending = []; }
+  }
+  function savePending(){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(pending)); } catch(e){}
+  }
+
+  function currentList(){
+    const all = isAdmin ? published.concat(pending) : published.slice();
+    // stable sort: highest first, ties keep the order they were added
+    return all.sort((a,b) => b.score - a.score);
+  }
+
+  function render(){
+    const board = $("board");
+    board.textContent = "";
+    const list = currentList();
+
+    if(list.length === 0){
+      const d = document.createElement("div");
+      d.className = "empty";
+      d.textContent = "No players at the table yet. Place your bets! 🎲";
+      board.appendChild(d);
+    }
+
+    list.forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "row" + (i < 3 ? " top" + (i+1) : "");
+
+      const rank = document.createElement("div");
+      rank.className = "rank";
+      rank.textContent = i === 0 ? "👑" : "#" + (i+1);
+
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = p.name;
+
+      const score = document.createElement("div");
+      score.className = "score";
+      score.textContent = p.score;
+
+      row.append(rank, name, score);
+      board.appendChild(row);
+    });
+
+    $("loginArea").classList.toggle("hidden", isAdmin);
+    $("dealerPanel").classList.toggle("hidden", !isAdmin);
+    $("exportBox").value = JSON.stringify(currentList(), null, 2);
+  }
+
+  // ---- login ----
+  $("showLoginBtn").onclick = () => {
+    $("loginPanel").classList.toggle("hidden");
+    $("pw").focus();
+  };
+  function tryLogin(){
+    if($("pw").value === PASSWORD){
+      isAdmin = true;
+      sessionStorage.setItem("dealer", "1");
+      $("pw").value = "";
+      $("loginMsg").textContent = "";
+      render();
+    } else {
+      $("loginMsg").textContent = "Wrong password. The house wins. 🃏";
+    }
+  }
+  $("loginBtn").onclick = tryLogin;
+  $("pw").addEventListener("keydown", e => { if(e.key === "Enter") tryLogin(); });
+
+  $("logoutBtn").onclick = () => {
+    isAdmin = false;
+    sessionStorage.removeItem("dealer");
+    render();
+  };
+
+  // ---- add score ----
+  function addScore(){
+    const name = $("nameIn").value.trim();
+    const score = Number($("scoreIn").value);
+    if(!name || $("scoreIn").value === "" || !Number.isFinite(score)){
+      $("addMsg").textContent = "Enter a name and a valid number.";
+      return;
+    }
+    pending.push({ name, score });
+    savePending();
+    $("nameIn").value = "";
+    $("scoreIn").value = "";
+    $("addMsg").textContent = "";
+    $("nameIn").focus();
+    render();
+  }
+  $("addBtn").onclick = addScore;
+  $("scoreIn").addEventListener("keydown", e => { if(e.key === "Enter") addScore(); });
+
+  // ---- export ----
+  $("copyBtn").onclick = async () => {
+    const box = $("exportBox");
+    try { await navigator.clipboard.writeText(box.value); $("addMsg").textContent = "Copied! Paste it into scores.json."; }
+    catch(e){ box.select(); document.execCommand("copy"); $("addMsg").textContent = "Copied! Paste it into scores.json."; }
+  };
+  $("clearBtn").onclick = () => {
+    pending = [];
+    savePending();
+    render();
+    $("addMsg").textContent = "Pending list cleared.";
+  };
+
+  // ---- start ----
+  loadPending();
+  fetch("scores.json", { cache: "no-store" })
+    .then(r => r.json())
+    .then(data => { published = Array.isArray(data) ? data : []; })
+    .catch(() => { published = []; })
+    .finally(render);
+</script>
+</body>
+</html>
