@@ -17,26 +17,26 @@
       radial-gradient(ellipse at 50% 0%,#8f1024 0%,#3a0610 45%,#050102 100%);
     background-attachment:fixed;
   }
-  .wrap{max-width:560px;margin:0 auto}
+  .wrap{max-width:920px;margin:0 auto}
   input,button{font-family:inherit;font-size:.95rem}
 
-  .head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px}
   h1{
     font-family:'Monoton',cursive;font-weight:400;text-align:center;line-height:1.05;margin:0;
-    font-size:clamp(1.5rem,6.5vw,2.4rem);color:#ffd75e;
+    font-size:clamp(1.5rem,7.5vw,4.4rem);color:#ffd75e;
     text-shadow:0 0 6px #ff3b5c,0 0 18px #ff1744,0 0 34px #c8102e;
   }
-  .roul{width:84px;height:84px;flex:none;filter:drop-shadow(0 4px 6px #000)}
+  .roul{width:clamp(76px,16vw,150px);height:clamp(76px,16vw,150px);flex:none;filter:drop-shadow(0 4px 6px #000)}
   .roul svg{width:100%;height:100%;animation:spin 14s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .dice{display:flex;gap:6px;cursor:pointer;flex:none;width:84px;justify-content:center}
-  .die{width:38px;height:38px;filter:drop-shadow(0 4px 5px #000);animation:tumble 2.6s ease-in-out infinite}
+  .dice{display:flex;gap:8px;cursor:pointer;flex:none;width:clamp(76px,16vw,150px);justify-content:center}
+  .die{width:clamp(34px,7.2vw,68px);height:clamp(34px,7.2vw,68px);filter:drop-shadow(0 4px 5px #000);animation:tumble 2.6s ease-in-out infinite}
   .die+.die{animation-delay:-1.3s}
   .die svg{width:100%;height:100%;display:block}
-  @keyframes tumble{0%,100%{transform:rotate(-10deg) translateY(0)}50%{transform:rotate(10deg) translateY(-6px)}}
+  @keyframes tumble{0%,100%{transform:rotate(-10deg) translateY(0)}50%{transform:rotate(10deg) translateY(-8px)}}
 
   /* chasing marquee lights around the board */
-  .frame{position:relative;padding:24px;margin-top:8px}
+  .frame{position:relative;padding:26px;margin-top:10px}
   .bulbs{position:absolute;display:block;pointer-events:none;filter:drop-shadow(0 0 5px #ffb400)}
   .bulbs.h{left:0;right:0;height:22px;animation:chH 1s steps(1) infinite;
     background:radial-gradient(circle,#fff6c2 4px,#ffb400 6px,transparent 7px) 11px 50%/44px 100% repeat-x,
@@ -49,48 +49,66 @@
   @keyframes chV{0%{background-position:50% 11px,50% 33px}50%{background-position:50% 33px,50% 11px}}
 
   .board{
-    border:3px solid var(--gold);border-radius:14px;padding:4px 8px;
-    background:rgba(0,0,0,.6);box-shadow:0 0 22px rgba(245,197,66,.35) inset,0 8px 24px rgba(0,0,0,.6);
+    border:4px solid var(--gold);border-radius:18px;padding:clamp(6px,1.4vw,14px) clamp(8px,1.8vw,18px);
+    background:rgba(0,0,0,.6);box-shadow:0 0 26px rgba(245,197,66,.35) inset,0 8px 24px rgba(0,0,0,.6);
   }
+
+  /* big rows for the top 5 */
   .row{
-    position:relative;display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:10px;
-    padding:5px 10px;margin:6px 0;border-radius:10px;font-size:1rem;
+    position:relative;display:grid;grid-template-columns:clamp(46px,9vw,76px) 1fr auto;align-items:center;
+    gap:clamp(8px,2vw,20px);
+    padding:clamp(12px,2.6vw,24px) clamp(12px,2.4vw,26px);
+    margin:clamp(8px,1.6vw,16px) 0;border-radius:16px;
+    font-size:clamp(1.25rem,4.8vw,2.6rem);
     background:linear-gradient(90deg,rgba(255,255,255,.12),rgba(255,255,255,.03));
-    border:1px solid rgba(245,197,66,.3);
+    border:2px solid rgba(245,197,66,.35);
   }
-  .board.dealer .row{grid-template-columns:38px 1fr auto auto;gap:8px}
+  .board.dealer .row{grid-template-columns:clamp(46px,9vw,76px) 1fr auto auto}
   .rank{
-    width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:.85rem;
-    background:var(--red);border:3px dashed #fff;box-shadow:0 2px 4px rgba(0,0,0,.6);
+    width:clamp(42px,8.5vw,70px);height:clamp(42px,8.5vw,70px);border-radius:50%;
+    display:grid;place-items:center;font-size:clamp(1rem,3.6vw,1.9rem);
+    background:var(--red);border:4px dashed #fff;box-shadow:0 3px 6px rgba(0,0,0,.6);
   }
   .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em}
   .score{
-    min-width:64px;text-align:center;padding:3px 10px;border-radius:999px;
-    background:#0b0b0b;color:var(--gold);border:2px solid var(--gold);text-shadow:0 0 6px rgba(245,197,66,.8);
+    min-width:clamp(86px,18vw,180px);text-align:center;padding:.1em .45em;border-radius:999px;
+    background:#0b0b0b;color:var(--gold);border:3px solid var(--gold);text-shadow:0 0 8px rgba(245,197,66,.8);
   }
-  .row.top1{background:linear-gradient(90deg,#f5c542,#b8860b);color:#2b1d00;font-size:1.12rem}
+  .row.top1{background:linear-gradient(90deg,#f5c542,#b8860b);color:#2b1d00;font-size:clamp(1.5rem,5.8vw,3.2rem);
+    box-shadow:0 0 30px rgba(245,197,66,.7)}
   .row.top2{background:linear-gradient(90deg,#e4e4e4,#8f8f8f);color:#1d1d1d}
   .row.top3{background:linear-gradient(90deg,#d08a4b,#8a5122);color:#1f1000}
   .top1 .rank,.top2 .rank,.top3 .rank{background:#111;color:var(--gold);border-color:var(--gold)}
-  .empty{text-align:center;padding:26px;opacity:.85;font-size:.9rem}
+  .empty{text-align:center;padding:36px 10px;opacity:.9;font-size:clamp(1rem,3.5vw,1.6rem)}
 
-  .cards{display:flex;justify-content:center;margin-top:8px}
-  .cardwrap{width:50px;margin-left:-16px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+  /* dealer-only rows below 5th place stay small */
+  .divider{text-align:center;font-size:.75rem;color:var(--gold);opacity:.85;margin:18px 0 4px}
+  .row.extra{
+    grid-template-columns:34px 1fr auto;padding:6px 10px;margin:6px 0;font-size:1rem;border-radius:10px;
+    box-shadow:none;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.03));color:var(--cream);
+    border:1px solid rgba(245,197,66,.3);
+  }
+  .board.dealer .row.extra{grid-template-columns:34px 1fr auto auto}
+  .row.extra .rank{width:30px;height:30px;font-size:.8rem;border-width:2px}
+  .row.extra .score{min-width:64px;border-width:2px;font-size:1rem}
+
+  .cards{display:flex;justify-content:center;margin-top:10px}
+  .cardwrap{width:clamp(56px,11vw,92px);margin-left:-18px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
   .cardwrap:first-child{margin-left:0}
   .cardwrap svg{display:block;width:100%;height:auto}
 
   .toast{
     position:fixed;top:10px;left:50%;transform:translate(-50%,-160%);z-index:9;
-    background:#000;color:var(--gold);border:2px solid var(--gold);padding:8px 16px;border-radius:999px;
-    transition:transform .35s;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem;
+    background:#000;color:var(--gold);border:2px solid var(--gold);padding:10px 20px;border-radius:999px;
+    transition:transform .35s;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(.85rem,2.5vw,1.2rem);
     box-shadow:0 0 18px rgba(245,197,66,.6);
   }
   .toast.show{transform:translate(-50%,0)}
   #soundBtn{position:fixed;top:10px;right:10px;z-index:8;padding:6px 10px;font-size:.7rem}
 
   .actions{display:flex;gap:6px}
-  .editIn{padding:6px 8px;font-size:.9rem;border-radius:6px;width:100%;min-width:0;border:2px solid var(--gold);background:#fffdf3;color:#222}
-  .scoreEdit{width:84px}
+  .editIn{padding:6px 8px;font-size:1rem;border-radius:6px;width:100%;min-width:0;border:2px solid var(--gold);background:#fffdf3;color:#222}
+  .scoreEdit{width:96px}
   .panel{margin-top:22px;padding:16px;border-radius:14px;border:2px solid var(--gold);background:rgba(0,0,0,.5)}
   .panel h2{margin:0 0 10px;font-weight:400;color:var(--gold)}
   input{padding:10px 12px;border-radius:8px;border:2px solid var(--gold);background:#fffdf3;color:#222;width:100%}
@@ -99,14 +117,13 @@
   button{padding:10px 18px;border-radius:8px;border:2px solid #7a5a00;background:linear-gradient(#ffd75e,#e0a800);color:#2b1d00;cursor:pointer}
   button:hover{filter:brightness(1.1)}
   button.dark{background:#222;color:var(--gold);border-color:var(--gold)}
-  .mini{padding:4px 9px;font-size:.9rem;line-height:1.1;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.6)}
+  .mini{padding:4px 9px;font-size:.95rem;line-height:1.1;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.6)}
   .mini.del{color:#ff9aa8}
   .msg{min-height:1.2em;margin-top:8px;color:#ffb3bd;font-size:.85rem}
   .hint{font-size:.75rem;opacity:.85;margin:10px 0}
   .center{text-align:center}
   .hidden{display:none}
   .version{text-align:center;margin-top:30px;font-size:.7rem;opacity:.5}
-  @media(max-width:420px){.roul{width:64px;height:64px}.dice{width:70px}.die{width:30px;height:30px}.row{font-size:.9rem}}
 </style>
 </head>
 <body>
@@ -145,11 +162,11 @@
       <button id="addBtn">Deal</button>
     </div>
     <div class="msg" id="addMsg"></div>
-    <div class="hint">Changes go live for everyone right away. Visitors see the top 10; you see everyone so you can fix any score with ✏️ or remove it with 🗑.</div>
+    <div class="hint">Changes go live for everyone right away. Visitors see only the top 5; you see everyone so you can fix any score with ✏️ or remove it with 🗑.</div>
     <button class="dark" id="logoutBtn">Leave table</button>
   </div>
 
-  <div class="version">v6</div>
+  <div class="version">v7</div>
 </div>
 
 <script type="module">
@@ -170,7 +187,7 @@
     measurementId: "G-X3EZHW0XRT"
   };
   const DEALER_EMAIL = "dealer@highrollers.app";
-  const TOP = 10;
+  const TOP = 5;
 
   const $ = id => document.getElementById(id);
 
@@ -324,7 +341,10 @@
     const made = [];
 
     shown.forEach((p, i) => {
-      const row = el("div", "row" + (i < 3 ? " top"+(i+1) : ""));
+      if(isAdmin && i === TOP){
+        board.appendChild(el("div","divider","▼ Below the top " + TOP + " (only you can see these) ▼"));
+      }
+      const row = el("div", "row" + (i < 3 ? " top"+(i+1) : "") + (i >= TOP ? " extra" : ""));
       row.dataset.key = p.key;
       row.appendChild(el("div", "rank", String(i+1)));
 
@@ -382,7 +402,7 @@
         } else {       // brand new on the board: rises from the bottom
           row.style.zIndex = 5;
           a = row.animate([
-            {transform:"translateY(110px) scale(.9)", opacity:0},
+            {transform:"translateY(140px) scale(.9)", opacity:0},
             {transform:"none", opacity:1}
           ], {duration:1000, easing:"cubic-bezier(.2,.9,.25,1)"});
         }
@@ -471,7 +491,7 @@
       sorted.forEach((p, i) => { nr[p.key] = i; });
 
       if(!first){
-        // find the top-10 player who was pushed down the furthest up the board
+        // find the top-5 player who was pushed down the furthest up the board
         let victim = null;
         sorted.forEach(p => {
           if(p.key in ranks && ranks[p.key] < TOP && nr[p.key] > ranks[p.key]){
