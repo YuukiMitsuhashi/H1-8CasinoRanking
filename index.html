@@ -35,8 +35,17 @@
   .die svg{width:100%;height:100%;display:block}
   @keyframes tumble{0%,100%{transform:rotate(-10deg) translateY(0)}50%{transform:rotate(10deg) translateY(-8px)}}
 
+  /* page label + countdown bar */
+  .pagebadge{
+    text-align:center;font-size:clamp(1rem,3.4vw,1.7rem);color:var(--gold);margin:10px 0 0;
+    letter-spacing:.08em;text-shadow:0 0 10px rgba(245,197,66,.7);
+  }
+  .pagebar{height:8px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;margin:8px 26px 0}
+  .pagebar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffb400,#fff6c2);box-shadow:0 0 10px #ffb400}
+  @keyframes fill{from{width:0}to{width:100%}}
+
   /* chasing marquee lights around the board */
-  .frame{position:relative;padding:26px;margin-top:10px}
+  .frame{position:relative;padding:26px;margin-top:4px}
   .bulbs{position:absolute;display:block;pointer-events:none;filter:drop-shadow(0 0 5px #ffb400)}
   .bulbs.h{left:0;right:0;height:22px;animation:chH 1s steps(1) infinite;
     background:radial-gradient(circle,#fff6c2 4px,#ffb400 6px,transparent 7px) 11px 50%/44px 100% repeat-x,
@@ -53,7 +62,7 @@
     background:rgba(0,0,0,.6);box-shadow:0 0 26px rgba(245,197,66,.35) inset,0 8px 24px rgba(0,0,0,.6);
   }
 
-  /* big rows for the top 5 */
+  /* big rows */
   .row{
     position:relative;display:grid;grid-template-columns:clamp(46px,9vw,76px) 1fr auto;align-items:center;
     gap:clamp(8px,2vw,20px);
@@ -81,7 +90,7 @@
   .top1 .rank,.top2 .rank,.top3 .rank{background:#111;color:var(--gold);border-color:var(--gold)}
   .empty{text-align:center;padding:36px 10px;opacity:.9;font-size:clamp(1rem,3.5vw,1.6rem)}
 
-  /* dealer-only rows below 5th place stay small */
+  /* dealer-only: players below 5th place (after pressing "Show all players") */
   .divider{text-align:center;font-size:.75rem;color:var(--gold);opacity:.85;margin:18px 0 4px}
   .row.extra{
     grid-template-columns:34px 1fr auto;padding:6px 10px;margin:6px 0;font-size:1rem;border-radius:10px;
@@ -137,6 +146,9 @@
     <div class="dice" id="dice" title="Roll the dice"></div>
   </div>
 
+  <div class="pagebadge" id="pagebadge"></div>
+  <div class="pagebar hidden" id="pagebar"><i id="pagefill"></i></div>
+
   <div class="frame">
     <i class="bulbs h t"></i><i class="bulbs h b"></i><i class="bulbs v l"></i><i class="bulbs v r"></i>
     <div class="board" id="board"></div>
@@ -162,11 +174,14 @@
       <button id="addBtn">Deal</button>
     </div>
     <div class="msg" id="addMsg"></div>
-    <div class="hint">Changes go live for everyone right away. Visitors see only the top 5; you see everyone so you can fix any score with ✏️ or remove it with 🗑.</div>
-    <button class="dark" id="logoutBtn">Leave table</button>
+    <div class="hint">Changes go live for everyone right away. The board flips between ranks 1-5 and 6-10, and pauses while you edit a row. Use ✏️ to fix a score and 🗑 to remove one. To see everyone at once (including below 10th place), press "Show all players".</div>
+    <div class="inline">
+      <button class="dark" id="allBtn">Show all players (to edit)</button>
+      <button class="dark" id="logoutBtn">Leave table</button>
+    </div>
   </div>
 
-  <div class="version">v7</div>
+  <div class="version">v8</div>
 </div>
 
 <script type="module">
@@ -187,7 +202,8 @@
     measurementId: "G-X3EZHW0XRT"
   };
   const DEALER_EMAIL = "dealer@highrollers.app";
-  const TOP = 5;
+  const TOP = 5;                    // players per page
+  const PAGE_MS = [20000, 10000];   // page 1 (ranks 1-5): 20 s, page 2 (ranks 6-10): 10 s
 
   const $ = id => document.getElementById(id);
 
@@ -305,6 +321,9 @@
   /* ================= STATE ================= */
   let entries = [], ranks = {};
   let loaded = false, loadError = "", editingKey = null, isAdmin = false;
+  let showAll = false;   // dealer only: show everyone at once, no page flipping
+  let page = 0;          // 0 = ranks 1-5, 1 = ranks 6-10
+  let pageTimer = null;
   const configured = !String(firebaseConfig.apiKey).startsWith("PASTE");
   let app, auth, db;
 
@@ -320,9 +339,48 @@
     return b;
   }
 
+  /* ================= PAGE FLIPPING (1-5 for 20 s, 6-10 for 10 s) ================= */
+  function totalPages(){ return entries.length > TOP ? 2 : 1; }
+
+  function restartBar(ms){
+    const f = $("pagefill");
+    f.style.animation = "none";
+    void f.offsetWidth;   // restart the animation
+    f.style.animation = "fill " + ms + "ms linear forwards";
+  }
+
+  function startPageTimer(){
+    clearTimeout(pageTimer);
+    pageTimer = setTimeout(nextPage, PAGE_MS[page]);
+    restartBar(PAGE_MS[page]);
+  }
+
+  function nextPage(){
+    // wait while the dealer is editing a row
+    if(editingKey !== null){ pageTimer = setTimeout(nextPage, 2000); return; }
+    page = (page + 1) % totalPages();
+    render(false, true);
+    startPageTimer();
+  }
+
+  // starts or stops the flipping depending on how many players there are
+  function ensureTimer(){
+    const should = totalPages() > 1 && !(isAdmin && showAll);
+    $("pagebar").classList.toggle("hidden", !should);
+    if(!should){
+      clearTimeout(pageTimer);
+      pageTimer = null;
+      page = 0;
+      return;
+    }
+    if(pageTimer === null) startPageTimer();
+  }
+
   /* ================= RENDER (with rise animation) ================= */
-  function render(animate){
+  function render(animate, flip){
     const board = $("board");
+    if(page >= totalPages()) page = 0;
+    const full = isAdmin && showAll;
 
     // remember where every row is now, so we can slide it to its new spot
     const old = {};
@@ -337,16 +395,20 @@
     else if(entries.length === 0) board.appendChild(el("div","empty","No players at the table yet. Place your bets! 🎲"));
 
     const sorted = entries.slice().sort((a,b) => b.score - a.score);
-    const shown = isAdmin ? sorted : sorted.slice(0, TOP);
+    const shown = full ? sorted : sorted.slice(page * TOP, page * TOP + TOP);
     const made = [];
 
+    $("pagebadge").textContent = !loaded ? "" : full ? "★ ALL PLAYERS ★"
+      : (page === 0 ? "★ TOP 5 ★" : "★ RANKS 6 – 10 ★");
+
     shown.forEach((p, i) => {
-      if(isAdmin && i === TOP){
+      const abs = full ? i : page * TOP + i;   // real position on the leaderboard
+      if(full && abs === TOP){
         board.appendChild(el("div","divider","▼ Below the top " + TOP + " (only you can see these) ▼"));
       }
-      const row = el("div", "row" + (i < 3 ? " top"+(i+1) : "") + (i >= TOP ? " extra" : ""));
+      const row = el("div", "row" + (abs < 3 ? " top"+(abs+1) : "") + (full && abs >= TOP ? " extra" : ""));
       row.dataset.key = p.key;
-      row.appendChild(el("div", "rank", String(i+1)));
+      row.appendChild(el("div", "rank", String(abs+1)));
 
       if(isAdmin && editingKey === p.key){
         const nameIn = el("input","editIn"); nameIn.type = "text"; nameIn.maxLength = 30; nameIn.value = p.name;
@@ -364,7 +426,7 @@
         row.append(c1, c2, actions);
         setTimeout(() => nameIn.focus(), 0);
       } else {
-        row.appendChild(el("div","name",(i === 0 ? "👑 " : "") + p.name));
+        row.appendChild(el("div","name",(abs === 0 ? "👑 " : "") + p.name));
         row.appendChild(el("div","score",p.score));
         if(isAdmin){
           const actions = el("div","actions");
@@ -379,7 +441,13 @@
       made.push(row);
     });
 
-    if(animate){
+    if(flip){
+      // page change: the new page fades in from slightly below
+      board.animate([
+        {opacity:0, transform:"translateY(24px)"},
+        {opacity:1, transform:"none"}
+      ], {duration:600, easing:"ease-out"});
+    } else if(animate){
       made.forEach(row => {
         const k = row.dataset.key, nt = row.getBoundingClientRect().top;
         let a;
@@ -399,7 +467,7 @@
               {transform:"none", filter:"none"}
             ], {duration:1200, easing:"cubic-bezier(.3,.7,.3,1)"});
           }
-        } else {       // brand new on the board: rises from the bottom
+        } else {       // brand new on the page: rises from the bottom
           row.style.zIndex = 5;
           a = row.animate([
             {transform:"translateY(140px) scale(.9)", opacity:0},
@@ -459,6 +527,12 @@
   $("addBtn").onclick = addScore;
   $("scoreIn").addEventListener("keydown", e => { if(e.key === "Enter") addScore(); });
   $("logoutBtn").onclick = () => { if(auth) signOut(auth); };
+  $("allBtn").onclick = () => {
+    showAll = !showAll;
+    $("allBtn").textContent = showAll ? "Back to the flipping board" : "Show all players (to edit)";
+    ensureTimer();
+    render();
+  };
 
   /* ================= START ================= */
   drawDecor();
@@ -471,7 +545,12 @@
 
     onAuthStateChanged(auth, user => {
       isAdmin = !!user;
-      if(!isAdmin) editingKey = null;
+      if(!isAdmin){
+        editingKey = null;
+        showAll = false;
+        $("allBtn").textContent = "Show all players (to edit)";
+      }
+      ensureTimer();
       render();
     });
 
@@ -491,16 +570,17 @@
       sorted.forEach((p, i) => { nr[p.key] = i; });
 
       if(!first){
-        // find the top-5 player who was pushed down the furthest up the board
+        // find the top-10 player who was pushed down the furthest up the board
         let victim = null;
         sorted.forEach(p => {
-          if(p.key in ranks && ranks[p.key] < TOP && nr[p.key] > ranks[p.key]){
+          if(p.key in ranks && ranks[p.key] < TOP * 2 && nr[p.key] > ranks[p.key]){
             if(!victim || ranks[p.key] < ranks[victim.key]) victim = p;
           }
         });
         if(victim){ horn(); toast("🎺 " + victim.name + " just got passed!"); }
       }
       ranks = nr;
+      ensureTimer();
       if(editingKey === null) render(!first);
     }, err => {
       loadError = err.code || err.message;
