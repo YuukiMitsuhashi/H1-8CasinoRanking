@@ -2,14 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>High Rollers Leaderboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Monoton&display=swap" rel="stylesheet">
 <style>
   :root{--gold:#f5c542;--red:#c8102e;--cream:#fff8e1}
   *{box-sizing:border-box}
   body{
-    margin:0;min-height:100vh;padding:14px 10px 50px;
+    margin:0;min-height:100vh;padding:48px 10px 50px;
     font-family:'Bungee',Impact,sans-serif;color:var(--cream);
     background:
       repeating-linear-gradient(45deg,rgba(255,255,255,.035) 0 2px,transparent 2px 26px),
@@ -19,6 +21,11 @@
   }
   .wrap{max-width:920px;margin:0 auto}
   input,button{font-family:inherit;font-size:.95rem}
+
+  /* full screen mode: centered, no dealer controls, no version label */
+  body.fs{display:flex;align-items:center;justify-content:center;padding-top:16px;padding-bottom:16px}
+  body.fs .wrap{width:100%;max-width:1100px}
+  body.fs #loginArea,body.fs #dealerPanel,body.fs .version{display:none}
 
   .head{display:flex;align-items:center;justify-content:space-between;gap:10px}
   h1{
@@ -107,13 +114,14 @@
   .cardwrap svg{display:block;width:100%;height:auto}
 
   .toast{
-    position:fixed;top:10px;left:50%;transform:translate(-50%,-160%);z-index:9;
-    background:#000;color:var(--gold);border:2px solid var(--gold);padding:10px 20px;border-radius:999px;
-    transition:transform .35s;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(.85rem,2.5vw,1.2rem);
+    position:fixed;top:10px;left:50%;transform:translate(-50%,-200%);z-index:9;
+    background:#000;color:var(--gold);border:2px solid var(--gold);padding:10px 20px;border-radius:18px;
+    transition:transform .35s;width:max-content;max-width:90vw;text-align:center;font-size:clamp(.85rem,2.5vw,1.2rem);
     box-shadow:0 0 18px rgba(245,197,66,.6);
   }
   .toast.show{transform:translate(-50%,0)}
   #soundBtn{position:fixed;top:10px;right:10px;z-index:8;padding:6px 10px;font-size:.7rem}
+  #fsBtn{position:fixed;top:10px;left:10px;z-index:8;padding:6px 10px;font-size:.7rem}
 
   .actions{display:flex;gap:6px}
   .editIn{padding:6px 8px;font-size:1rem;border-radius:6px;width:100%;min-width:0;border:2px solid var(--gold);background:#fffdf3;color:#222}
@@ -136,6 +144,7 @@
 </style>
 </head>
 <body>
+<button class="dark" id="fsBtn">⛶ Full screen</button>
 <button class="dark" id="soundBtn">🔈 Tap for sound</button>
 <div class="toast" id="toast"></div>
 
@@ -174,14 +183,14 @@
       <button id="addBtn">Deal</button>
     </div>
     <div class="msg" id="addMsg"></div>
-    <div class="hint">Changes go live for everyone right away. The board flips between ranks 1-5 and 6-10, and pauses while you edit a row. Use ✏️ to fix a score and 🗑 to remove one. To see everyone at once (including below 10th place), press "Show all players".</div>
+    <div class="hint">Changes go live for everyone right away. The board flips between ranks 1-5 and 6-10, and pauses while you edit a row. Use ✏️ to fix a score and 🗑 to remove one. To see everyone at once (including below 10th place), press "Show all players". Press F to go full screen (the dealer controls are hidden while in full screen).</div>
     <div class="inline">
       <button class="dark" id="allBtn">Show all players (to edit)</button>
       <button class="dark" id="logoutBtn">Leave table</button>
     </div>
   </div>
 
-  <div class="version">v8</div>
+  <div class="version">v9</div>
 </div>
 
 <script type="module">
@@ -310,13 +319,60 @@
   }
 
   let toastTimer;
-  function toast(msg){
+  function toast(msg, ms){
     const t = $("toast");
     t.textContent = msg;
     t.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+    toastTimer = setTimeout(() => t.classList.remove("show"), ms || 3200);
   }
+
+  /* ================= FULL SCREEN ================= */
+  const fsEl = document.documentElement;
+  const canFS = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen);
+  let wakeLock = null;
+
+  function isFS(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+
+  // keeps the screen from going to sleep while the board is on full screen
+  async function setWake(on){
+    try {
+      if(on && "wakeLock" in navigator){ wakeLock = await navigator.wakeLock.request("screen"); }
+      else if(wakeLock){ await wakeLock.release(); wakeLock = null; }
+    } catch(e){}
+  }
+
+  function updateFsBtn(){
+    const on = isFS();
+    $("fsBtn").textContent = on ? "✕ Exit full screen" : "⛶ Full screen";
+    document.body.classList.toggle("fs", on);
+    setWake(on);
+  }
+
+  function toggleFS(){
+    if(!canFS){
+      toast("iPhone: tap Share, then Add to Home Screen, and open it from there for full screen.", 7000);
+      return;
+    }
+    try {
+      if(isFS()){
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        const p = (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl);
+        if(p && p.catch) p.catch(() => {});
+      }
+    } catch(e){}
+  }
+
+  $("fsBtn").onclick = toggleFS;
+  document.addEventListener("fullscreenchange", updateFsBtn);
+  document.addEventListener("webkitfullscreenchange", updateFsBtn);
+  document.addEventListener("keydown", e => {
+    const tag = (e.target.tagName || "").toUpperCase();
+    if((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey && !e.altKey && tag !== "INPUT" && tag !== "TEXTAREA"){
+      toggleFS();
+    }
+  });
 
   /* ================= STATE ================= */
   let entries = [], ranks = {};
